@@ -1,15 +1,16 @@
 {
-  "name": "ttt9-server",
-  "version": "1.0.0",
-  "main": "server.js",
+  "name": "ttt9-9-9-server",
+  "version": "3.1.0",
+  "private": true,
+  "type": "module",
   "scripts": {
     "start": "node server.js"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "express": "^5.1.0",
-    "pg": "^8.16.3",
-    "bcryptjs": "^3.0.2",
-    "jsonwebtoken": "^9.0.2",
-    "cors": "^2.8.5"
+    "pg": "^8.16.3"
   }
 }
