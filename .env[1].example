@@ -1,0 +1,6 @@
+PORT=3000
+ADMIN_PASSWORD=DOI_MAT_KHAU_NAY
+# Khi deploy thật, điền 2 URL GitHub Pages, ngăn cách bằng dấu phẩy:
+ALLOWED_ORIGINS=https://thientu09072009-sys.github.io
+# Có thể dùng đường dẫn file riêng nếu host có persistent disk:
+# DATA_FILE=/var/data/codes.json
