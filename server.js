@@ -190,230 +190,310 @@ function verifyPassword(password, stored) {
 
 async function initDb() {
   /*
-    QUAN TRONG:
-
-    Ban dau code cu co:
-
-      ALTER TABLE users ...
-
-    truoc khi CREATE TABLE users.
-
-    Neu database moi -> users chua ton tai
-    -> server crash.
-
-    Ban nay CREATE TABLE truoc,
-    sau do moi migration.
-  */
+   * ================================
+   * USERS
+   * ================================
+   */
 
   await q(`
-    CREATE TABLE IF NOT EXISTS users(
+    CREATE TABLE IF NOT EXISTS users (
       id BIGSERIAL PRIMARY KEY,
-
       username VARCHAR(24) UNIQUE NOT NULL,
-
       password_hash TEXT NOT NULL,
-
       ttt BIGINT NOT NULL DEFAULT 0,
-
       plays BIGINT NOT NULL DEFAULT 0,
-
       biggest_win BIGINT NOT NULL DEFAULT 0,
-
       total_won BIGINT NOT NULL DEFAULT 0,
-
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
       last_login_at TIMESTAMPTZ
     )
   `);
 
-  await q(`
-    CREATE TABLE IF NOT EXISTS sessions(
-      token_hash CHAR(64) PRIMARY KEY,
+  /*
+   * DATABASE CŨ:
+   * bổ sung những cột còn thiếu.
+   */
 
+  await q(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS password_hash TEXT
+  `);
+
+  await q(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS ttt BIGINT NOT NULL DEFAULT 0
+  `);
+
+  await q(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS plays BIGINT NOT NULL DEFAULT 0
+  `);
+
+  await q(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS biggest_win BIGINT NOT NULL DEFAULT 0
+  `);
+
+  await q(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS total_won BIGINT NOT NULL DEFAULT 0
+  `);
+
+  await q(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS created_at
+    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  `);
+
+  await q(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS last_login_at
+    TIMESTAMPTZ
+  `);
+
+
+  /*
+   * ================================
+   * SESSIONS
+   * ================================
+   */
+
+  await q(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      token_hash CHAR(64) PRIMARY KEY,
       user_id BIGINT NOT NULL
         REFERENCES users(id)
         ON DELETE CASCADE,
-
       expires_at TIMESTAMPTZ NOT NULL
     )
   `);
 
   await q(`
-    CREATE TABLE IF NOT EXISTS redeem_codes(
+    ALTER TABLE sessions
+    ADD COLUMN IF NOT EXISTS expires_at
+    TIMESTAMPTZ
+  `);
+
+
+  /*
+   * ================================
+   * REDEEM CODES
+   * ================================
+   */
+
+  await q(`
+    CREATE TABLE IF NOT EXISTS redeem_codes (
       id BIGSERIAL PRIMARY KEY,
-
       code VARCHAR(40) UNIQUE NOT NULL,
-
-      reward BIGINT NOT NULL
-        CHECK(reward > 0),
-
+      reward BIGINT NOT NULL DEFAULT 0,
       max_uses INT NOT NULL DEFAULT 1,
-
       uses INT NOT NULL DEFAULT 0,
-
       active BOOLEAN NOT NULL DEFAULT TRUE,
-
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
       expires_at TIMESTAMPTZ
     )
   `);
 
   await q(`
-    CREATE TABLE IF NOT EXISTS tx_rounds(
-      id BIGSERIAL PRIMARY KEY,
-
-      started_at TIMESTAMPTZ NOT NULL,
-
-      ends_at TIMESTAMPTZ NOT NULL,
-
-      status VARCHAR(12) NOT NULL DEFAULT 'open',
-
-      d1 SMALLINT,
-
-      d2 SMALLINT,
-
-      d3 SMALLINT,
-
-      total SMALLINT,
-
-      side VARCHAR(5),
-
-      result_until TIMESTAMPTZ
-    )
-  `);
-
-  await q(`
-    CREATE TABLE IF NOT EXISTS tx_bets(
-      id BIGSERIAL PRIMARY KEY,
-
-      round_id BIGINT NOT NULL
-        REFERENCES tx_rounds(id)
-        ON DELETE CASCADE,
-
-      user_id BIGINT NOT NULL
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-      side VARCHAR(4) NOT NULL
-        CHECK(side IN('tai','xiu')),
-
-      amount BIGINT NOT NULL
-        CHECK(amount > 0),
-
-      settled BOOLEAN NOT NULL DEFAULT FALSE,
-
-      win_ttt BIGINT NOT NULL DEFAULT 0,
-
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-
-  await q(`
-    CREATE TABLE IF NOT EXISTS tx_history(
-      id BIGSERIAL PRIMARY KEY,
-
-      round_id BIGINT UNIQUE NOT NULL
-        REFERENCES tx_rounds(id)
-        ON DELETE CASCADE,
-
-      d1 SMALLINT NOT NULL,
-
-      d2 SMALLINT NOT NULL,
-
-      d3 SMALLINT NOT NULL,
-
-      total SMALLINT NOT NULL,
-
-      side VARCHAR(5) NOT NULL,
-
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-
-  await q(`
-    CREATE TABLE IF NOT EXISTS xd_rounds(
-      id BIGSERIAL PRIMARY KEY,
-
-      started_at TIMESTAMPTZ NOT NULL,
-
-      ends_at TIMESTAMPTZ NOT NULL,
-
-      status VARCHAR(12) NOT NULL DEFAULT 'open',
-
-      red_count SMALLINT,
-
-      white_count SMALLINT,
-
-      side VARCHAR(5),
-
-      multiplier NUMERIC(8,2),
-
-      result_until TIMESTAMPTZ
-    )
-  `);
-
-  await q(`
-    CREATE TABLE IF NOT EXISTS xd_bets(
-      id BIGSERIAL PRIMARY KEY,
-
-      round_id BIGINT NOT NULL
-        REFERENCES xd_rounds(id)
-        ON DELETE CASCADE,
-
-      user_id BIGINT NOT NULL
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-      side VARCHAR(4) NOT NULL
-        CHECK(side IN('chan','le')),
-
-      amount BIGINT NOT NULL
-        CHECK(amount > 0),
-
-      settled BOOLEAN NOT NULL DEFAULT FALSE,
-
-      win_ttt BIGINT NOT NULL DEFAULT 0,
-
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-
-  await q(`
-    CREATE TABLE IF NOT EXISTS xd_history(
-      id BIGSERIAL PRIMARY KEY,
-
-      round_id BIGINT UNIQUE NOT NULL
-        REFERENCES xd_rounds(id)
-        ON DELETE CASCADE,
-
-      red_count SMALLINT NOT NULL,
-
-      white_count SMALLINT NOT NULL,
-
-      side VARCHAR(5) NOT NULL,
-
-      multiplier NUMERIC(8,2) NOT NULL,
-
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-
-  /*
-    ===============================
-    MIGRATIONS
-    ===============================
-  */
-
-  await q(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ
+    ALTER TABLE redeem_codes
+    ADD COLUMN IF NOT EXISTS reward BIGINT
   `);
 
   await q(`
     ALTER TABLE redeem_codes
-    ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ
+    ADD COLUMN IF NOT EXISTS max_uses INT
+  `);
+
+  await q(`
+    ALTER TABLE redeem_codes
+    ADD COLUMN IF NOT EXISTS uses INT
+  `);
+
+  await q(`
+    ALTER TABLE redeem_codes
+    ADD COLUMN IF NOT EXISTS active BOOLEAN
+  `);
+
+  await q(`
+    ALTER TABLE redeem_codes
+    ADD COLUMN IF NOT EXISTS created_at
+    TIMESTAMPTZ
+  `);
+
+  await q(`
+    ALTER TABLE redeem_codes
+    ADD COLUMN IF NOT EXISTS expires_at
+    TIMESTAMPTZ
+  `);
+
+  /*
+   * Giá trị mặc định cho database cũ.
+   */
+
+  await q(`
+    UPDATE redeem_codes
+    SET reward = 0
+    WHERE reward IS NULL
+  `);
+
+  await q(`
+    UPDATE redeem_codes
+    SET max_uses = 1
+    WHERE max_uses IS NULL
+  `);
+
+  await q(`
+    UPDATE redeem_codes
+    SET uses = 0
+    WHERE uses IS NULL
+  `);
+
+  await q(`
+    UPDATE redeem_codes
+    SET active = TRUE
+    WHERE active IS NULL
+  `);
+
+
+  /*
+   * ================================
+   * TÀI XỈU - ROUNDS
+   * ================================
+   */
+
+  await q(`
+    CREATE TABLE IF NOT EXISTS tx_rounds (
+      id BIGSERIAL PRIMARY KEY,
+      started_at TIMESTAMPTZ NOT NULL,
+      ends_at TIMESTAMPTZ NOT NULL,
+      status VARCHAR(12) NOT NULL DEFAULT 'open',
+      d1 SMALLINT,
+      d2 SMALLINT,
+      d3 SMALLINT,
+      total SMALLINT,
+      side VARCHAR(5),
+      result_until TIMESTAMPTZ
+    )
+  `);
+
+  await q(`
+    ALTER TABLE tx_rounds
+    ADD COLUMN IF NOT EXISTS d1 SMALLINT
+  `);
+
+  await q(`
+    ALTER TABLE tx_rounds
+    ADD COLUMN IF NOT EXISTS d2 SMALLINT
+  `);
+
+  await q(`
+    ALTER TABLE tx_rounds
+    ADD COLUMN IF NOT EXISTS d3 SMALLINT
+  `);
+
+  await q(`
+    ALTER TABLE tx_rounds
+    ADD COLUMN IF NOT EXISTS total SMALLINT
+  `);
+
+  await q(`
+    ALTER TABLE tx_rounds
+    ADD COLUMN IF NOT EXISTS side VARCHAR(5)
+  `);
+
+  await q(`
+    ALTER TABLE tx_rounds
+    ADD COLUMN IF NOT EXISTS result_until
+    TIMESTAMPTZ
+  `);
+
+
+  /*
+   * ================================
+   * TÀI XỈU - BETS
+   * ================================
+   */
+
+  await q(`
+    CREATE TABLE IF NOT EXISTS tx_bets (
+      id BIGSERIAL PRIMARY KEY,
+      round_id BIGINT NOT NULL
+        REFERENCES tx_rounds(id)
+        ON DELETE CASCADE,
+      user_id BIGINT NOT NULL
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+      side VARCHAR(4) NOT NULL,
+      amount BIGINT NOT NULL,
+      settled BOOLEAN NOT NULL DEFAULT FALSE,
+      win_ttt BIGINT NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await q(`
+    ALTER TABLE tx_bets
+    ADD COLUMN IF NOT EXISTS settled BOOLEAN
+  `);
+
+  await q(`
+    ALTER TABLE tx_bets
+    ADD COLUMN IF NOT EXISTS win_ttt BIGINT
+  `);
+
+  await q(`
+    UPDATE tx_bets
+    SET settled = FALSE
+    WHERE settled IS NULL
+  `);
+
+  await q(`
+    UPDATE tx_bets
+    SET win_ttt = 0
+    WHERE win_ttt IS NULL
+  `);
+
+
+  /*
+   * ================================
+   * TÀI XỈU - HISTORY
+   * ================================
+   */
+
+  await q(`
+    CREATE TABLE IF NOT EXISTS tx_history (
+      id BIGSERIAL PRIMARY KEY,
+      round_id BIGINT UNIQUE NOT NULL
+        REFERENCES tx_rounds(id)
+        ON DELETE CASCADE,
+      d1 SMALLINT NOT NULL,
+      d2 SMALLINT NOT NULL,
+      d3 SMALLINT NOT NULL,
+      total SMALLINT NOT NULL,
+      side VARCHAR(5) NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+
+  /*
+   * ================================
+   * XÓC ĐĨA - ROUNDS
+   * ================================
+   */
+
+  await q(`
+    CREATE TABLE IF NOT EXISTS xd_rounds (
+      id BIGSERIAL PRIMARY KEY,
+      started_at TIMESTAMPTZ NOT NULL,
+      ends_at TIMESTAMPTZ NOT NULL,
+      status VARCHAR(12) NOT NULL DEFAULT 'open',
+      red_count SMALLINT,
+      white_count SMALLINT,
+      side VARCHAR(5),
+      multiplier NUMERIC(8,2),
+      result_until TIMESTAMPTZ
+    )
   `);
 
   await q(`
@@ -438,40 +518,110 @@ async function initDb() {
 
   await q(`
     ALTER TABLE xd_rounds
-    ADD COLUMN IF NOT EXISTS result_until TIMESTAMPTZ
+    ADD COLUMN IF NOT EXISTS result_until
+    TIMESTAMPTZ
   `);
+
 
   /*
-    ===============================
-    INDEX
-    ===============================
-  */
+   * ================================
+   * XÓC ĐĨA - BETS
+   * ================================
+   */
 
   await q(`
-    CREATE INDEX IF NOT EXISTS idx_sessions_user
-    ON sessions(user_id)
+    CREATE TABLE IF NOT EXISTS xd_bets (
+      id BIGSERIAL PRIMARY KEY,
+      round_id BIGINT NOT NULL
+        REFERENCES xd_rounds(id)
+        ON DELETE CASCADE,
+      user_id BIGINT NOT NULL
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+      side VARCHAR(4) NOT NULL,
+      amount BIGINT NOT NULL,
+      settled BOOLEAN NOT NULL DEFAULT FALSE,
+      win_ttt BIGINT NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
   `);
 
   await q(`
-    CREATE INDEX IF NOT EXISTS idx_sessions_expiry
-    ON sessions(expires_at)
+    ALTER TABLE xd_bets
+    ADD COLUMN IF NOT EXISTS settled BOOLEAN
   `);
 
   await q(`
-    CREATE INDEX IF NOT EXISTS idx_tx_bets_round
-    ON tx_bets(round_id)
+    ALTER TABLE xd_bets
+    ADD COLUMN IF NOT EXISTS win_ttt BIGINT
   `);
 
   await q(`
-    CREATE INDEX IF NOT EXISTS idx_xd_bets_round
-    ON xd_bets(round_id)
+    UPDATE xd_bets
+    SET settled = FALSE
+    WHERE settled IS NULL
   `);
 
   await q(`
-    CREATE INDEX IF NOT EXISTS idx_users_rank
-    ON users(total_won DESC, biggest_win DESC)
+    UPDATE xd_bets
+    SET win_ttt = 0
+    WHERE win_ttt IS NULL
   `);
 
+
+  /*
+   * ================================
+   * XÓC ĐĨA - HISTORY
+   * ================================
+   */
+
+  await q(`
+    CREATE TABLE IF NOT EXISTS xd_history (
+      id BIGSERIAL PRIMARY KEY,
+      round_id BIGINT UNIQUE NOT NULL
+        REFERENCES xd_rounds(id)
+        ON DELETE CASCADE,
+      red_count SMALLINT NOT NULL,
+      white_count SMALLINT NOT NULL,
+      side VARCHAR(5) NOT NULL,
+      multiplier NUMERIC(8,2) NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+
+  /*
+   * ================================
+   * TẠO VÁN ĐẦU TIÊN
+   * ================================
+   */
+
+  const txExists =
+    await q(`
+      SELECT id
+      FROM tx_rounds
+      LIMIT 1
+    `);
+
+  if (!txExists.rowCount) {
+    await createTxRound();
+  }
+
+  const xdExists =
+    await q(`
+      SELECT id
+      FROM xd_rounds
+      LIMIT 1
+    `);
+
+  if (!xdExists.rowCount) {
+    await createXdRound();
+  }
+
+  console.log(
+    "DATABASE INITIALIZED SUCCESSFULLY"
+  );
+}
   /*
     ===============================
     TAO VAN DAU TIEN
