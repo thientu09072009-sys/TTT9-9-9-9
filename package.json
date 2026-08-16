@@ -1,6 +1,6 @@
 {
   "name": "ttt9-9-9-server",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "private": true,
   "type": "module",
   "scripts": {
